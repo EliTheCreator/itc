@@ -49,7 +49,7 @@ impl Parser {
                 }
             }
         }
-        
+
         s.parse::<u32>().map_err(ParseError::from)
     }
 
@@ -125,7 +125,7 @@ impl FromStr for IdTree {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut p = s.chars().peekable();
         Parser::take_id_tree(&mut p)
-    } 
+    }
 }
 
 impl FromStr for EventTree {

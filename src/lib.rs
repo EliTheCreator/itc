@@ -1,10 +1,10 @@
 //! # Interval Tree Clocks
-//! 
+//!
 //! The itc crate implements Interval Tree Clocks as described in
 //! http://gsd.di.uminho.pt/members/cbm/ps/itc2008.pdf
-//! 
+//!
 //! # Usage:
-//! 
+//!
 //! ```
 //! use itc::*;
 //!
@@ -224,7 +224,7 @@ impl Stamp {
             EventTree::Node {n, left: ref e_left, right: ref e_right} => {
                 if let IdTree::Node {left: ref i_left, right: ref i_right} = self.i {
                     if **i_left == IdTree::zero() {
-                        let (eprime_right, c_right) = Stamp::new(i_right.as_ref().clone(), e_right.as_ref().clone()).grow();    
+                        let (eprime_right, c_right) = Stamp::new(i_right.as_ref().clone(), e_right.as_ref().clone()).grow();
                         (EventTree::node(n, e_left.clone(), Box::new(eprime_right)), c_right + 1)
                     } else if **i_right == IdTree::zero() {
                         let (eprime_left, c_left) = Stamp::new(*i_left.clone(), *e_left.clone()).grow();
@@ -248,7 +248,7 @@ impl Stamp {
 }
 
 pub trait Min<T> {
-    fn min(&self) -> T; 
+    fn min(&self) -> T;
 }
 
 pub trait Max<T> {
@@ -365,8 +365,8 @@ impl LessThanOrEqual for EventTree {
             EventTree::Node {n: n1, left: ref left1, right: ref right1} => {
                 match *other {
                     EventTree::Leaf {n: n2} => {
-                        (n1 <= n2) 
-                        && left1.clone().lift(n1).leq(&EventTree::leaf(n2)) 
+                        (n1 <= n2)
+                        && left1.clone().lift(n1).leq(&EventTree::leaf(n2))
                         && right1.clone().lift(n1).leq(&EventTree::leaf(n2))
                     },
                     EventTree::Node {n: n2, left: ref left2, right: ref right2} => {
@@ -454,7 +454,7 @@ impl Sum for IdTree {
 }
 
 pub trait IntervalTreeClock where Self: Sized {
-    
+
     fn fork(&self) -> (Self, Self);
     fn peek(&self) -> (Self, Self);
     fn join(&self, other: &Self) -> Self;
