@@ -3,7 +3,10 @@ use std::num;
 use std::iter::Peekable;
 use std::str::FromStr;
 
-use super::*;
+use crate::event_tree::EventTree;
+use crate::id_tree::IdTree;
+use crate::stamp::Stamp;
+
 
 impl fmt::Display for IdTree {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -167,7 +170,6 @@ impl fmt::Display for Stamp {
 
 #[cfg(test)]
 mod tests {
-    use ::{IdTree,EventTree,Stamp};
     use std::str::FromStr;
     use super::*;
 
