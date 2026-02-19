@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::{borrow::Cow, cmp};
 
 use crate::cost::Cost;
@@ -91,5 +92,11 @@ impl Stamp {
                 }
             }
         }
+    }
+}
+
+impl PartialOrd for Stamp {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.e.partial_cmp(&other.e)
     }
 }

@@ -89,12 +89,59 @@ impl EventTree {
     }
 }
 
-pub trait Min<T> {
-    fn min(&self) -> T;
+impl PartialOrd for EventTree {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let first = self.clone().norm();
+        let second = other.clone().norm();
+
+        let two_way_cmp = {
+            | l: Option<Ordering>, r: Option<Ordering> | -> Option<Ordering> {
+                use std::cmp::Ordering::*;
+                match (l, r) {
+                    (_, None) | (None, _) => None,
+                    (Some(Less), Some(Greater)) => None,
+                    (Some(Greater), Some(Less)) => None,
+                    (Some(Less), Some(Equal)) => Some(Less),
+                    (Some(Equal), Some(Less)) => Some(Less),
+                    (Some(Equal), Some(Greater)) => Some(Greater),
+                    (Some(Greater), Some(Equal)) => Some(Greater),
+                    (Some(Less), Some(Less)) => Some(Less),
+                    (Some(Equal), Some(Equal)) => Some(Equal),
+                    (Some(Greater), Some(Greater)) => Some(Greater),
+                }
+            }
+        };
+
+        match (first, second) {
+            (EventTree::Leaf { n: n1 }, EventTree::Leaf { n: n2 }) => n1.partial_cmp(&n2),
+            (EventTree::Leaf { n: n1 }, EventTree::Node { n: n2, left, right }) => {
+                vec![
+                    n1.partial_cmp(&n2),
+                    EventTree::Leaf { n: n1 }.partial_cmp(&left.lift(n2)),
+                    EventTree::Leaf { n: n1 }.partial_cmp(&right.lift(n2)),
+                ].into_iter().reduce(two_way_cmp).flatten()
+            },
+            (EventTree::Node { n: n1, left, right }, EventTree::Leaf { n: n2 }) => {
+                vec![
+                    n1.partial_cmp(&n2),
+                    left.lift(n1).partial_cmp(&EventTree::Leaf { n: n2 }),
+                    right.lift(n1).partial_cmp(&EventTree::Leaf { n: n2 }),
+                ].into_iter().reduce(two_way_cmp).flatten()
+            },
+            (EventTree::Node { n: n1, left: left1, right: right1 }, EventTree::Node { n: n2, left: left2, right: right2 }) => {
+                vec![
+                    n1.partial_cmp(&n2),
+                    left1.lift(n1).partial_cmp(&left2.lift(n2)),
+                    right1.lift(n1).partial_cmp(&right2.lift(n2)),
+                ].into_iter().reduce(two_way_cmp).flatten()
+            },
+        }
+    }
 }
 
-pub trait Max<T> {
-    fn max(&self) -> T;
+
+pub trait Min<T> {
+    fn min(&self) -> T;
 }
 
 impl Min<u32> for EventTree {
@@ -104,6 +151,11 @@ impl Min<u32> for EventTree {
             EventTree::Node{n, ref left, ref right} => n + min(left.min(), right.min())
         }
     }
+}
+
+
+pub trait Max<T> {
+    fn max(&self) -> T;
 }
 
 impl Max<u32> for EventTree {

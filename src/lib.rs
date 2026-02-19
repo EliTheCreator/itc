@@ -34,7 +34,6 @@ pub mod cost;
 pub mod event_tree;
 pub mod id_tree;
 pub mod interval_tree_clock;
-pub mod less_than_or_equal;
 pub mod normalisable;
 pub mod stamp;
 
