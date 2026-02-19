@@ -1,9 +1,7 @@
 use crate::{id_tree::{IdTree, Split, Sum}, stamp::Stamp};
 
 
-
 pub trait IntervalTreeClock where Self: Sized {
-
     fn fork(&self) -> (Self, Self);
     fn peek(&self) -> (Self, Self);
     fn join(&self, other: &Self) -> Self;
