@@ -1,5 +1,4 @@
-use std::cmp::Ordering;
-use std::{borrow::Cow, cmp};
+use std::cmp::{Ordering, max};
 
 use crate::cost::Cost;
 use crate::event_tree::{EventTree, Max, Min};
@@ -25,72 +24,74 @@ impl Stamp {
         }
     }
 
-    pub fn fill<'a>(&'a self) -> Cow<'a, EventTree> {
-        if self.i == IdTree::zero() {
-            Cow::Borrowed(&self.e)
-        } else if self.i == IdTree::one() {
-            Cow::Owned(EventTree::leaf(self.e.max()))
-        } else if let EventTree::Leaf {..} = self.e {
-            Cow::Borrowed(&self.e)
-        } else {
-            if let IdTree::Node {left: ref i_left, right: ref i_right} = self.i {
-                if let EventTree::Node {n, left: ref e_left, right: ref e_right} = self.e {
-                    if i_left.as_ref() == &IdTree::one() {
-                        let eprime_right = Stamp::new(i_right.as_ref().clone(), e_right.as_ref().clone()).fill().into_owned();
-                        let new_left = EventTree::leaf(cmp::max(e_left.max(), eprime_right.min()));
-                        Cow::Owned(EventTree::node(n, Box::new(new_left), Box::new(eprime_right)).norm())
-                    } else if i_right.as_ref() == &IdTree::one() {
-                        let eprime_left = Stamp::new(i_left.as_ref().clone(), e_left.as_ref().clone()).fill().into_owned();
-                        let new_right = EventTree::leaf(cmp::max(e_right.max(), eprime_left.min()));
-                        Cow::Owned(EventTree::node(n, Box::new(eprime_left), Box::new(new_right)).norm())
-                    } else {
-                        let new_left = Stamp::new(i_left.as_ref().clone(), e_left.as_ref().clone()).fill().into_owned();
-                        let new_right = Stamp::new(i_right.as_ref().clone(), e_right.as_ref().clone()).fill().into_owned();
-                        Cow::Owned(EventTree::node(n, Box::new(new_left), Box::new(new_right)).norm())
-                    }
-                } else {
-                    unreachable!()
+    pub fn fill(&self) -> EventTree {
+        match (&self.i, &self.e) {
+            (IdTree::Leaf { i: false }, EventTree::Node { ..}) => self.e.clone(),
+            (IdTree::Leaf { i: true }, EventTree::Node { ..}) => EventTree::leaf(self.e.max()),
+            (IdTree::Node { .. }, EventTree::Leaf { .. }) => self.e.clone(),
+            // TODO: rewrite this as multiple cases instead of a second match
+            //       statement if/once the box syntax is stabilised
+            (IdTree::Node { left: i_l, right: i_r }, EventTree::Node { n, left: e_l, right: e_r }) => {
+                match (i_l.as_ref(), i_r.as_ref()) {
+                    (IdTree::Leaf { i: true }, IdTree::Node { .. }) => {
+                        let eprime_r = Stamp::new(*i_r.clone(), *e_r.clone()).fill();
+                        let new_e_l = EventTree::leaf(max(e_l.max(), eprime_r.min()));
+                        EventTree::node(*n, Box::new(new_e_l), Box::new(eprime_r)).norm()
+                    },
+                    (IdTree::Node { .. }, IdTree::Leaf { i: true }) => {
+                        let eprime_l = Stamp::new(*i_l.clone(), *e_l.clone()).fill();
+                        let new_e_r = EventTree::leaf(max(e_r.max(), eprime_l.min()));
+                        EventTree::node(*n, Box::new(eprime_l), Box::new(new_e_r)).norm()
+                    },
+                    (IdTree::Node { .. }, IdTree::Node { .. }) => {
+                        let new_e_l = Stamp::new(*i_l.clone(), *e_l.clone()).fill();
+                        let new_e_r = Stamp::new(*i_r.clone(), *e_r.clone()).fill();
+                        EventTree::node(*n, Box::new(new_e_l), Box::new(new_e_r)).norm()
+                    },
+                    _ => unreachable!(),
                 }
-            } else {
-                unreachable!()
-            }
+            },
+            _ => unreachable!()
         }
     }
 
-    // returns event tree and cost
     pub fn grow(&self) -> (EventTree, Cost) {
-        match self.e {
-            EventTree::Leaf {n} => {
-                if self.i == IdTree::one() {
-                    (EventTree::leaf(n + 1), Cost::zero())
-                } else {
-                    let new_e = EventTree::node(n, Box::new(EventTree::zero()), Box::new(EventTree::zero()));
-                    let (eprime, c) = Stamp::new(self.i.clone(), new_e).grow();
-                    (eprime, c.shift())
+        match (&self.i, &self.e) {
+            (IdTree::Leaf { i: true }, EventTree::Leaf { n }) => (EventTree::leaf(*n+1), Cost::zero()),
+            (_, EventTree::Leaf { n }) => {
+                let new_e = EventTree::node(*n, Box::new(EventTree::zero()), Box::new(EventTree::zero()));
+                let (eprime, c) = Stamp::new(self.i.clone(), new_e).grow();
+                (eprime, c.shift())
+            },
+            // TODO: rewrite this as multiple cases instead of a second match
+            //       statement if/once the box syntax is stabilised
+            (IdTree::Node { left: i_l, right: i_r }, EventTree::Node { n, left: e_l, right: e_r }) => {
+                match (i_l.as_ref(), i_r.as_ref()) {
+                    (IdTree::Leaf { i: false }, IdTree::Node { .. }) => {
+                        let (eprime_r, c_r) = Stamp::new(*i_r.clone(), *e_r.clone()).grow();
+                        let new_e = EventTree::node(*n, e_l.clone(), Box::new(eprime_r));
+                        (new_e, c_r+1)
+                    },
+                    (IdTree::Node { .. }, IdTree::Leaf { i: false }) => {
+                        let (eprime_l, c_l) = Stamp::new(*i_l.clone(), *e_l.clone()).grow();
+                        let new_e = EventTree::node(*n, Box::new(eprime_l), e_r.clone());
+                        (new_e, c_l+1)
+                    },
+                    (IdTree::Node { .. }, IdTree::Node { .. }) => {
+                        let (eprime_l, c_l) = Stamp::new(*i_l.clone(), *e_l.clone()).grow();
+                        let (eprime_r, c_r) = Stamp::new(*i_r.clone(), *e_r.clone()).grow();
+                        if c_l < c_r {
+                            let new_e = EventTree::node(*n, Box::new(eprime_l), e_r.clone());
+                            (new_e, c_l+1)
+                        } else {
+                            let new_e = EventTree::node(*n, e_l.clone(), Box::new(eprime_r));
+                            (new_e, c_r+1)
+                        }
+                    },
+                    _ => unreachable!(),
                 }
             },
-            EventTree::Node {n, left: ref e_left, right: ref e_right} => {
-                if let IdTree::Node {left: ref i_left, right: ref i_right} = self.i {
-                    if **i_left == IdTree::zero() {
-                        let (eprime_right, c_right) = Stamp::new(i_right.as_ref().clone(), e_right.as_ref().clone()).grow();
-                        (EventTree::node(n, e_left.clone(), Box::new(eprime_right)), c_right + 1)
-                    } else if **i_right == IdTree::zero() {
-                        let (eprime_left, c_left) = Stamp::new(*i_left.clone(), *e_left.clone()).grow();
-                        (EventTree::node(n, Box::new(eprime_left), e_right.clone()), c_left + 1)
-                    } else {
-                        let (eprime_right, c_right) = Stamp::new(*i_right.clone(), *e_right.clone()).grow();
-                        let (eprime_left, c_left) = Stamp::new(*i_left.clone(), *e_left.clone()).grow();
-                        if c_left < c_right {
-                            (EventTree::node(n, Box::new(eprime_left), e_right.clone()), c_left + 1)
-                        } else {
-                            (EventTree::node(n, e_left.clone(), Box::new(eprime_right)), c_right + 1)
-                        }
-                    }
-                } else {
-                    // corrupted tree?
-                    unreachable!()
-                }
-            }
+            _ => unreachable!(),
         }
     }
 }

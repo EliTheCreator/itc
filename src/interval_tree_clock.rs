@@ -1,4 +1,5 @@
-use crate::{id_tree::{IdTree, Split, Sum}, stamp::Stamp};
+use crate::id_tree::{IdTree, Split, Sum};
+use crate::stamp::Stamp;
 
 
 pub trait IntervalTreeClock where Self: Sized {
@@ -20,13 +21,10 @@ impl IntervalTreeClock for Stamp {
     }
 
     fn fork(&self) -> (Stamp, Stamp) {
-        if let IdTree::Node {left, right} = self.i.split() {
-            let s1 = Stamp::new(*left, self.e.clone());
-            let s2 = Stamp::new(*right, self.e.clone());
-            (s1, s2)
-        } else {
-            unreachable!()
-        }
+        let (left, right) = self.i.split();
+        let s1 = Stamp::new(left, self.e.clone());
+        let s2 = Stamp::new(right, self.e.clone());
+        (s1, s2)
     }
 
     fn join(&self, other: &Stamp) -> Stamp {
@@ -38,11 +36,10 @@ impl IntervalTreeClock for Stamp {
     fn event(&self) -> Stamp {
         let filled_e = self.fill();
 
-        if filled_e.as_ref() != &self.e {
-            Stamp::new(self.i.clone(), filled_e.into_owned())
+        if filled_e != self.e {
+            Stamp::new(self.i.clone(), filled_e)
         } else {
             let (eprime, _c) = self.grow();
-
             Stamp::new(self.i.clone(), eprime)
         }
     }

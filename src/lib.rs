@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn split_test() {
-        assert_eq!(IdTree::one().split(), IdTree::node(Box::new(IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero()))), Box::new(IdTree::node(Box::new(IdTree::zero()), Box::new(IdTree::one())))));
+        assert_eq!(IdTree::one().split(), (IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())), IdTree::node(Box::new(IdTree::zero()), Box::new(IdTree::one()))));
     }
 
     #[test]

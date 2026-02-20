@@ -41,45 +41,44 @@ impl IdTree {
 
 
 pub trait Split {
-    fn split(&self) -> Self;
+    fn split(&self) -> (Self, Self) where Self: Sized;
 }
 
 impl Split for IdTree {
-    fn split(&self) -> IdTree {
-        match *self {
-            IdTree::Leaf {i} => {
-                if !i {
-                    IdTree::node(Box::new(IdTree::zero()), Box::new(IdTree::zero()))
-                } else {
-                    let new_left = Box::new(IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())));
-                    let new_right = Box::new(IdTree::node(Box::new(IdTree::zero()), Box::new(IdTree::one())));
-                    IdTree::node(new_left, new_right)
+    fn split(&self) -> (Self, Self) {
+        use self::IdTree::*;
+        match self {
+            Leaf { i: false } =>  (Self::zero(), Self::zero()),
+            Leaf { i: true } => {
+                let left = Self::node(Box::new(Self::one()), Box::new(Self::zero()));
+                let right = Self::node(Box::new(Self::zero()), Box::new(Self::one()));
+                (left, right)
+            },
+            // TODO: rewrite this as multiple cases instead of a second match
+            //       statement if/once the box syntax is stabilised
+            Node { left, ref right } => {
+                match (left.as_ref(), right.as_ref()) {
+                    (Leaf { i: false }, right) => {
+                        let (split1, split2) = right.split();
+
+                        let new_left = Self::node(Box::new(Self::zero()), Box::new(split1));
+                        let new_right = Self::node(Box::new(Self::zero()), Box::new(split2));
+                        (new_left, new_right)
+                    },
+                    (left, Leaf { i: false }) => {
+                        let (split1, split2) = left.split();
+
+                        let new_left = Self::node(Box::new(split1), Box::new(Self::zero()));
+                        let new_right = Self::node(Box::new(split2), Box::new(Self::zero()));
+                        (new_left, new_right)
+                    },
+                    (left, right ) => {
+                        let new_left = Self::node(Box::new(left.clone()), Box::new(Self::zero()));
+                        let new_right = Self::node(Box::new(Self::zero()), Box::new(right.clone()));
+                        (new_left, new_right)
+                    },
                 }
             },
-            IdTree::Node {ref left, ref right} => {
-                if *left.as_ref() == IdTree::zero() {
-                    // split always returns a Node, not a Leaf
-                    if let IdTree::Node{left: i1, right: i2} = right.split() {
-                        let new_left = Box::new(IdTree::node(Box::new(IdTree::zero()), i1));
-                        let new_right = Box::new(IdTree::node(Box::new(IdTree::zero()), i2));
-                        IdTree::node(new_left, new_right)
-                    } else {
-                        unreachable!()
-                    }
-                } else if *right.as_ref() == IdTree::zero() {
-                    if let IdTree::Node{left: i1, right: i2} = left.split() {
-                        let new_left = Box::new(IdTree::node(i1, Box::new(IdTree::zero())));
-                        let new_right = Box::new(IdTree::node(i2, Box::new(IdTree::zero())));
-                        IdTree::node(new_left, new_right)
-                    } else {
-                        unreachable!()
-                    }
-                } else {
-                    let new_left = Box::new(IdTree::node(left.clone(), Box::new(IdTree::zero())));
-                    let new_right = Box::new(IdTree::node(Box::new(IdTree::zero()), right.clone()));
-                    IdTree::node(new_left, new_right)
-                }
-            }
         }
     }
 }
@@ -90,26 +89,17 @@ pub trait Sum {
 }
 
 impl Sum for IdTree {
-    #[allow(non_shorthand_field_patterns)]
-    fn sum(&self, other: &IdTree) -> IdTree {
-        if *self == IdTree::zero() {
-            return other.clone();
-        } else if *other == IdTree::zero() {
-            return self.clone();
-        }
-
-        if let IdTree::Node {left: ref left1, right: ref right1} = *self {
-            if let IdTree::Node {left: ref left2, right: ref right2} = *other {
+    fn sum(&self, other: &Self) -> Self {
+        use self::IdTree::*;
+        match (self, other) {
+            (_, Leaf { i: false }) => self.clone(),
+            (Leaf { i: false }, _) => other.clone(),
+            (Node { left: left1, right: right1 }, Node { left: left2, right: right2 }) => {
                 let new_left = Box::new(left1.sum(left2));
                 let new_right = Box::new(right1.sum(right2));
-                return IdTree::node(new_left, new_right).norm();
-            } else {
-                // corrupted tree?
-                unreachable!();
-            }
-        } else {
-            // corrupted tree?
-            unreachable!();
+                Self::node(new_left, new_right).norm()
+            },
+            _ => unreachable!()
         }
     }
 }
