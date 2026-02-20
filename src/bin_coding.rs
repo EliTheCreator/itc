@@ -75,20 +75,19 @@ impl BitWriter {
             Leaf { i: true } => self.write_bits(1, 3),
             Node { left, right } => {
                 match (left.as_ref(), right.as_ref()) {
-                    (Leaf { i: false }, Node { .. }) => {
+                    (Leaf { i: false }, _) => {
                         self.write_bits(1, 2);
                         self.encode_id_tree(right);
                     },
-                    (Node { .. }, Leaf { i: false }) => {
+                    (_, Leaf { i: false }) => {
                         self.write_bits(2, 2);
                         self.encode_id_tree(left);
                     },
-                    (Node { .. }, Node { .. }) => {
+                    (_, _) => {
                         self.write_bits(3, 2);
                         self.encode_id_tree(left);
                         self.encode_id_tree(right);
                     },
-                    _ => unreachable!(),
                 }
             },
         }
@@ -104,45 +103,43 @@ impl BitWriter {
             Node { n: 0, left, right } => {
                 self.write_bit(false);
                 match (left.as_ref(), right.as_ref()) {
-                    (Leaf { n: 0 }, Node { .. }) => {
+                    (Leaf { n: 0 }, _) => {
                         self.write_bits(0, 2);
                         self.encode_event_tree(right);
                     },
-                    (Node { .. }, Leaf { n: 0 }) => {
+                    (_, Leaf { n: 0 }) => {
                         self.write_bits(1, 2);
                         self.encode_event_tree(left);
                     },
-                    (Node { .. }, Node { .. }) => {
+                    (_, _) => {
                         self.write_bits(2, 2);
                         self.encode_event_tree(left);
                         self.encode_event_tree(right);
                     },
-                    _ => unreachable!(),
                 }
             },
             Node { n, left, right } => {
                 self.write_bit(false);
                 match (left.as_ref(), right.as_ref()) {
-                    (Leaf { n: 0 }, Node { .. }) => {
+                    (Leaf { n: 0 }, _) => {
                         self.write_bits(3, 2);
                         self.write_bits(0, 2);
                         self.encode_u32(*n, 2);
                         self.encode_event_tree(right);
                     },
-                    (Node { .. }, Leaf { n: 0 }) => {
+                    (_, Leaf { n: 0 }) => {
                         self.write_bits(3, 2);
                         self.write_bits(1, 2);
                         self.encode_u32(*n, 2);
                         self.encode_event_tree(left);
                     },
-                    (Node { .. }, Node { .. }) => {
+                    (_, _) => {
                         self.write_bits(3, 2);
                         self.write_bit(true);
                         self.encode_u32(*n, 2);
                         self.encode_event_tree(left);
                         self.encode_event_tree(right);
                     },
-                    _ => unreachable!(),
                 }
             }
         }
