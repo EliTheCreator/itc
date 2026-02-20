@@ -29,7 +29,7 @@
 
 
 pub mod ascii_coding;
-pub mod bin;
+pub mod bin_coding;
 pub mod cost;
 pub mod event_tree;
 pub mod id_tree;
@@ -160,5 +160,17 @@ mod tests {
         let lelejlerjreele = lelejlerjreel.event();
 
         assert_eq!(lelejlerjreele, Stamp::new(IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())), EventTree::leaf(2)));
+    }
+
+    #[test]
+    fn bin_encoding() {
+        let (stamp, _) = Stamp::seed()
+            .event()
+            .event()
+            .fork();
+        let stamp = stamp.event()
+            .event();
+        let b: Box<[u8]> = stamp.into();
+        println!("{:?}", b);
     }
 }
