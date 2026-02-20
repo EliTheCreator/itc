@@ -56,7 +56,7 @@ impl Split for IdTree {
             },
             // TODO: rewrite this as multiple cases instead of a second match
             //       statement if/once the box syntax is stabilised
-            Node { left, ref right } => {
+            Node { left, right } => {
                 match (left.as_ref(), right.as_ref()) {
                     (Leaf { i: false }, right) => {
                         let (split1, split2) = right.split();
