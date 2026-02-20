@@ -35,19 +35,19 @@ impl BitWriter {
         Self {
             bytes: Vec::new(),
             current: 0,
-            bit_offset: 7,
+            bit_offset: 8,
         }
     }
 
     pub fn write_bit(&mut self, bit: bool) {
+        self.bit_offset -= 1;
+
         if bit {
             self.current |= 1 << self.bit_offset
         }
 
-        self.bit_offset -= 1;
-
         if self.bit_offset == 0 {
-            self.bit_offset = 7;
+            self.bit_offset = 8;
             self.bytes.push(self.current);
             self.current = 0;
         }
@@ -97,8 +97,7 @@ impl BitWriter {
         use crate::event_tree::EventTree::*;
         match event_tree {
             Leaf { n } => {
-                self.write_bit(true);
-                self.encode_u32(*n, 2);
+                self.encode_n(*n);
             },
             Node { n: 0, left, right } => {
                 self.write_bit(false);
@@ -124,25 +123,30 @@ impl BitWriter {
                     (Leaf { n: 0 }, _) => {
                         self.write_bits(3, 2);
                         self.write_bits(0, 2);
-                        self.encode_u32(*n, 2);
+                        self.encode_n(*n);
                         self.encode_event_tree(right);
                     },
                     (_, Leaf { n: 0 }) => {
                         self.write_bits(3, 2);
                         self.write_bits(1, 2);
-                        self.encode_u32(*n, 2);
+                        self.encode_n(*n);
                         self.encode_event_tree(left);
                     },
                     (_, _) => {
                         self.write_bits(3, 2);
                         self.write_bit(true);
-                        self.encode_u32(*n, 2);
+                        self.encode_n(*n);
                         self.encode_event_tree(left);
                         self.encode_event_tree(right);
                     },
                 }
             }
         }
+    }
+
+    fn encode_n(&mut self, n: u32) {
+        self.write_bit(true);
+        self.encode_u32(n, 2);
     }
 
     fn encode_u32(&mut self, n: u32, b: u8) {
@@ -260,7 +264,7 @@ impl Parser {
             (Some(true), Some(true)) => {
                 let left = self.parse_id_tree()?;
                 let right = self.parse_id_tree()?;
-                
+
                 Some(IdTree::node(
                     Box::new(left),
                     Box::new(right),
@@ -310,7 +314,7 @@ impl Parser {
                 match self.next() {
                     Some(false) => {
                         let condition = self.next()?;
-                        let n = self.parse_u32(2)?;
+                        let n = self.parse_n()?;
                         let mut left = EventTree::zero();
                         let mut right = self.parse_event_tree()?;
 
@@ -325,7 +329,7 @@ impl Parser {
                         ))
                     }
                     Some(true) => {
-                        let n = self.parse_u32(2)?;
+                        let n = self.parse_n()?;
                         let left = self.parse_event_tree_node()?;
                         let right = self.parse_event_tree_node()?;
 
@@ -348,17 +352,25 @@ impl Parser {
         Some(EventTree::leaf(n))
     }
 
+    fn parse_n(&mut self) -> Option<u32> {
+        if self.next()? {
+            self.parse_u32(2)
+        } else {
+            None
+        }
+    }
+
     fn parse_u32(&mut self, b: u32) -> Option<u32> {
         let condition = self.next()?;
         if condition {
+            Some((1<<b) + self.parse_u32(b+1)?)
+        } else {
             let mut n: u32 = 0;
             for offset in (0..b).rev() {
                 let bit = self.next()? as u32;
                 n += bit<<offset;
             }
             Some(n)
-        } else {
-            Some((1<<b) + self.parse_u32(b+1)?)
         }
     }
 }
@@ -373,7 +385,7 @@ impl Iterator for Parser {
 
 impl TryFrom<Box<[u8]>> for Stamp {
     type Error = ParseError;
-    
+
     fn try_from(bits: Box<[u8]>) -> std::result::Result<Self, Self::Error> {
         Parser::new(bits).parse_stamp().ok_or(ParseError::EndOfEncoding)
     }
@@ -381,7 +393,7 @@ impl TryFrom<Box<[u8]>> for Stamp {
 
 impl TryFrom<Box<[u8]>> for IdTree {
     type Error = ParseError;
-    
+
     fn try_from(bits: Box<[u8]>) -> std::result::Result<Self, Self::Error> {
         Parser::new(bits).parse_id_tree().ok_or(ParseError::EndOfEncoding)
     }
@@ -389,7 +401,7 @@ impl TryFrom<Box<[u8]>> for IdTree {
 
 impl TryFrom<Box<[u8]>> for EventTree {
     type Error = ParseError;
-    
+
     fn try_from(bits: Box<[u8]>) -> std::result::Result<Self, Self::Error> {
         Parser::new(bits).parse_event_tree().ok_or(ParseError::EndOfEncoding)
     }
