@@ -103,3 +103,14 @@ impl Sum for IdTree {
         }
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use crate::{IdTree, Split};
+
+    #[test]
+    fn split_test() {
+        assert_eq!(IdTree::one().split(), (IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())), IdTree::node(Box::new(IdTree::zero()), Box::new(IdTree::one()))));
+    }
+}
