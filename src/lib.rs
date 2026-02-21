@@ -161,16 +161,4 @@ mod tests {
 
         assert_eq!(lelejlerjreele, Stamp::new(IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())), EventTree::leaf(2)));
     }
-
-    #[test]
-    fn bin_encoding() {
-        let (stamp, _) = Stamp::seed()
-            .event()
-            .event()
-            .fork();
-        let stamp = stamp.event()
-            .event();
-        let b: Box<[u8]> = stamp.into();
-        println!("{:?}", b);
-    }
 }

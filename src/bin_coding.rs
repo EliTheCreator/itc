@@ -406,3 +406,40 @@ impl TryFrom<Box<[u8]>> for EventTree {
         Parser::new(bits).parse_event_tree().ok_or(ParseError::EndOfEncoding)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use std::convert::TryFrom;
+
+    use crate::event_tree::EventTree;
+    use crate::id_tree::IdTree;
+    use crate::stamp::Stamp;
+
+
+    #[test]
+    fn bin_encode() {
+        let stamp = Stamp::new(
+            IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())),
+            EventTree::node(2, Box::new(EventTree::leaf(2)), Box::new(EventTree::leaf(0))),
+        );
+
+        let b: Box<[u8]> = stamp.into();
+        let control: Box<[u8]> = vec![0b1000_1011,0b0110_1010,0b1000_0000].into_boxed_slice();
+
+        assert_eq!(b, control);
+    }
+
+    #[test]
+    fn bin_decode() {
+        let bits: Box<[u8]> = vec![0b1000_1011,0b0110_1011,0b1101_1101].into_boxed_slice();
+
+        let stamp = Stamp::try_from(bits).unwrap();
+        let control = Stamp::new(
+            IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())),
+            EventTree::node(2, Box::new(EventTree::leaf(57)), Box::new(EventTree::leaf(0))),
+        );
+
+        assert_eq!(stamp, control)
+    }
+}
