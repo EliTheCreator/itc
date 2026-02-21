@@ -67,77 +67,104 @@ impl BitWriter {
 
         self.bytes.into_boxed_slice()
     }
+}
 
-    pub fn encode_id_tree(&mut self, id_tree: &IdTree) {
+struct Encoder {
+    bit_writer: BitWriter,
+}
+
+impl Encoder {
+    pub fn new() -> Self {
+        Self { bit_writer: BitWriter::new() }
+    }
+
+    pub fn encode_stamp(mut self, stamp: Stamp) -> Box<[u8]> {
+        self.bit_writer = BitWriter::new();
+        self.encode_id_tree_impl(&stamp.i);
+        self.encode_event_tree_impl(&stamp.e);
+        self.bit_writer.finalize()
+    }
+
+    pub fn encode_id_tree(mut self, id_tree: IdTree) -> Box<[u8]> {
+        self.encode_id_tree_impl(&id_tree);
+        self.bit_writer.finalize()
+    }
+
+    pub fn encode_event_tree(mut self, event_tree: EventTree) -> Box<[u8]> {
+        self.encode_event_tree_impl(&event_tree);
+        self.bit_writer.finalize()
+    }
+
+    fn encode_id_tree_impl(&mut self, id_tree: &IdTree) {
         use crate::id_tree::IdTree::*;
         match id_tree {
-            Leaf { i: false } => self.write_bits(0, 3),
-            Leaf { i: true } => self.write_bits(1, 3),
+            Leaf { i: false } => self.bit_writer.write_bits(0, 3),
+            Leaf { i: true } => self.bit_writer.write_bits(1, 3),
             Node { left, right } => {
                 match (left.as_ref(), right.as_ref()) {
                     (Leaf { i: false }, _) => {
-                        self.write_bits(1, 2);
-                        self.encode_id_tree(right);
+                        self.bit_writer.write_bits(1, 2);
+                        self.encode_id_tree_impl(right);
                     },
                     (_, Leaf { i: false }) => {
-                        self.write_bits(2, 2);
-                        self.encode_id_tree(left);
+                        self.bit_writer.write_bits(2, 2);
+                        self.encode_id_tree_impl(left);
                     },
                     (_, _) => {
-                        self.write_bits(3, 2);
-                        self.encode_id_tree(left);
-                        self.encode_id_tree(right);
+                        self.bit_writer.write_bits(3, 2);
+                        self.encode_id_tree_impl(left);
+                        self.encode_id_tree_impl(right);
                     },
                 }
             },
         }
     }
 
-    pub fn encode_event_tree(&mut self, event_tree: &EventTree) {
+    fn encode_event_tree_impl(&mut self, event_tree: &EventTree) {
         use crate::event_tree::EventTree::*;
         match event_tree {
             Leaf { n } => {
                 self.encode_n(*n);
             },
             Node { n: 0, left, right } => {
-                self.write_bit(false);
+                self.bit_writer.write_bit(false);
                 match (left.as_ref(), right.as_ref()) {
                     (Leaf { n: 0 }, _) => {
-                        self.write_bits(0, 2);
-                        self.encode_event_tree(right);
+                        self.bit_writer.write_bits(0, 2);
+                        self.encode_event_tree_impl(right);
                     },
                     (_, Leaf { n: 0 }) => {
-                        self.write_bits(1, 2);
-                        self.encode_event_tree(left);
+                        self.bit_writer.write_bits(1, 2);
+                        self.encode_event_tree_impl(left);
                     },
                     (_, _) => {
-                        self.write_bits(2, 2);
-                        self.encode_event_tree(left);
-                        self.encode_event_tree(right);
+                        self.bit_writer.write_bits(2, 2);
+                        self.encode_event_tree_impl(left);
+                        self.encode_event_tree_impl(right);
                     },
                 }
             },
             Node { n, left, right } => {
-                self.write_bit(false);
+                self.bit_writer.write_bit(false);
                 match (left.as_ref(), right.as_ref()) {
                     (Leaf { n: 0 }, _) => {
-                        self.write_bits(3, 2);
-                        self.write_bits(0, 2);
+                        self.bit_writer.write_bits(3, 2);
+                        self.bit_writer.write_bits(0, 2);
                         self.encode_n(*n);
-                        self.encode_event_tree(right);
+                        self.encode_event_tree_impl(right);
                     },
                     (_, Leaf { n: 0 }) => {
-                        self.write_bits(3, 2);
-                        self.write_bits(1, 2);
+                        self.bit_writer.write_bits(3, 2);
+                        self.bit_writer.write_bits(1, 2);
                         self.encode_n(*n);
-                        self.encode_event_tree(left);
+                        self.encode_event_tree_impl(left);
                     },
                     (_, _) => {
-                        self.write_bits(3, 2);
-                        self.write_bit(true);
+                        self.bit_writer.write_bits(3, 2);
+                        self.bit_writer.write_bit(true);
                         self.encode_n(*n);
-                        self.encode_event_tree(left);
-                        self.encode_event_tree(right);
+                        self.encode_event_tree_impl(left);
+                        self.encode_event_tree_impl(right);
                     },
                 }
             }
@@ -145,44 +172,38 @@ impl BitWriter {
     }
 
     fn encode_n(&mut self, n: u32) {
-        self.write_bit(true);
+        self.bit_writer.write_bit(true);
         self.encode_u32(n, 2);
     }
 
     fn encode_u32(&mut self, n: u32, b: u8) {
         let two_to_pow_b = 2<<b;
         if n < two_to_pow_b {
-            self.write_bit(false);
-            self.write_bits(n, b);
+            self.bit_writer.write_bit(false);
+            self.bit_writer.write_bits(n, b);
         } else {
-            self.write_bit(true);
+            self.bit_writer.write_bit(true);
             self.encode_u32(n-two_to_pow_b, b+1);
         }
     }
 }
 
+
 impl Into<Box<[u8]>> for Stamp {
     fn into(self) -> Box<[u8]> {
-        let mut bit_writer = BitWriter::new();
-        bit_writer.encode_id_tree(&self.i);
-        bit_writer.encode_event_tree(&self.e);
-        bit_writer.finalize()
+        Encoder::new().encode_stamp(self)
     }
 }
 
 impl Into<Box<[u8]>> for IdTree {
     fn into(self) -> Box<[u8]> {
-        let mut bit_writer = BitWriter::new();
-        bit_writer.encode_id_tree(&self);
-        bit_writer.finalize()
+        Encoder::new().encode_id_tree(self)
     }
 }
 
 impl Into<Box<[u8]>> for EventTree {
     fn into(self) -> Box<[u8]> {
-        let mut bit_writer = BitWriter::new();
-        bit_writer.encode_event_tree(&self);
-        bit_writer.finalize()
+        Encoder::new().encode_event_tree(self)
     }
 }
 
@@ -344,7 +365,6 @@ impl Parser {
             },
             _ => None,
         }
-
     }
 
     fn parse_event_tree_leaf(&mut self) -> Option<EventTree> {
@@ -382,6 +402,7 @@ impl Iterator for Parser {
         self.bit_iter.next()
     }
 }
+
 
 impl TryFrom<Box<[u8]>> for Stamp {
     type Error = ParseError;
