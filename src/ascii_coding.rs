@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt;
 use std::num;
 use std::iter::Peekable;
@@ -28,6 +29,22 @@ pub enum ParseError {
     UnexpectedChar(char),
     ParseIntError(num::ParseIntError)
 }
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::ParseError::*;
+        match self {
+            EndOfString => write!(f, "unexpected end of string encountered"),
+            Error => write!(f, "error encountered"),
+            UnexpectedChar(c) => write!(f, "unexpected char '{c}' encountered"),
+            ParseIntError(parse_int_error) => {
+                write!(f, "error while parsing int {parse_int_error}")
+            },
+        }
+    }
+}
+
+impl Error for ParseError {}
 
 impl From<num::ParseIntError> for ParseError {
     fn from(e: num::ParseIntError) -> ParseError {
