@@ -24,6 +24,10 @@ impl Stamp {
         }
     }
 
+    pub fn history(&self) -> EventTree {
+        self.e.clone()
+    }
+
     pub fn fill(&self) -> EventTree {
         match (&self.i, &self.e) {
             (IdTree::Leaf { i: false }, _) => self.e.clone(),
