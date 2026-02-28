@@ -28,14 +28,21 @@
 //! for printing to stdout and use in protocols.
 
 
+mod cost;
+mod event_tree;
+mod id_tree;
+mod interval_tree_clock;
+mod normalisable;
+mod stamp;
 pub mod ascii_coding;
 pub mod bin_coding;
-pub mod cost;
-pub mod event_tree;
-pub mod id_tree;
-pub mod interval_tree_clock;
-pub mod normalisable;
-pub mod stamp;
+
+pub use cost::*;
+pub use event_tree::*;
+pub use id_tree::*;
+pub use interval_tree_clock::*;
+pub use normalisable::*;
+pub use stamp::*;
 
 
 #[cfg(test)]
