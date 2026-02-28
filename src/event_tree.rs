@@ -79,6 +79,13 @@ impl EventTree {
             },
         }
     }
+
+    pub fn dominates(&self, other: &Self) -> bool {
+        match self.partial_cmp(other) {
+            Some(Ordering::Equal) | Some(Ordering::Greater) => true,
+            _ => false,
+        }
+    }
 }
 
 impl PartialOrd for EventTree {
@@ -157,5 +164,21 @@ impl Max<u32> for EventTree {
             Self::Leaf{n} => *n,
             Self::Node{n, left, right} => n + max(left.max(), right.max())
         }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use crate::EventTree;
+
+    #[test]
+    fn test_join() {
+        let left = EventTree::from_str("(3,0,3)".into()).unwrap();
+        let right = EventTree::from_str("(3,3,0)".into()).unwrap();
+
+        assert_eq!(left.join(&right), right.join(&left));
     }
 }
