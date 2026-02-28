@@ -78,20 +78,20 @@ impl Encoder {
         Self { bit_writer: BitWriter::new() }
     }
 
-    pub fn encode_stamp(mut self, stamp: Stamp) -> Box<[u8]> {
+    pub fn encode_stamp(mut self, stamp: &Stamp) -> Box<[u8]> {
         self.bit_writer = BitWriter::new();
         self.encode_id_tree_impl(&stamp.i);
         self.encode_event_tree_impl(&stamp.e);
         self.bit_writer.finalize()
     }
 
-    pub fn encode_id_tree(mut self, id_tree: IdTree) -> Box<[u8]> {
-        self.encode_id_tree_impl(&id_tree);
+    pub fn encode_id_tree(mut self, id_tree: &IdTree) -> Box<[u8]> {
+        self.encode_id_tree_impl(id_tree);
         self.bit_writer.finalize()
     }
 
-    pub fn encode_event_tree(mut self, event_tree: EventTree) -> Box<[u8]> {
-        self.encode_event_tree_impl(&event_tree);
+    pub fn encode_event_tree(mut self, event_tree: &EventTree) -> Box<[u8]> {
+        self.encode_event_tree_impl(event_tree);
         self.bit_writer.finalize()
     }
 
@@ -189,34 +189,52 @@ impl Encoder {
 }
 
 
-impl Into<Box<[u8]>> for Stamp {
+impl Into<Box<[u8]>> for &Stamp {
     fn into(self) -> Box<[u8]> {
         Encoder::new().encode_stamp(self)
     }
 }
 
-impl Into<Box<[u8]>> for IdTree {
+impl Into<Box<[u8]>> for Stamp {
+    fn into(self) -> Box<[u8]> {
+        (&self).into()
+    }
+}
+
+impl Into<Box<[u8]>> for &IdTree {
     fn into(self) -> Box<[u8]> {
         Encoder::new().encode_id_tree(self)
     }
 }
 
-impl Into<Box<[u8]>> for EventTree {
+impl Into<Box<[u8]>> for IdTree {
+    fn into(self) -> Box<[u8]> {
+        (&self).into()
+    }
+}
+
+impl Into<Box<[u8]>> for &EventTree {
     fn into(self) -> Box<[u8]> {
         Encoder::new().encode_event_tree(self)
     }
 }
 
-
-#[derive(Debug)]
-struct BitIterator {
-    byte_offset: usize,
-    bit_offset: u8,
-    bits: Box<[u8]>,
+impl Into<Box<[u8]>> for EventTree {
+    fn into(self) -> Box<[u8]> {
+        (&self).into()
+    }
 }
 
-impl BitIterator {
-    pub fn new(bits: Box<[u8]>) -> Self {
+
+#[derive(Debug)]
+struct BitIterator<'a> {
+    byte_offset: usize,
+    bit_offset: u8,
+    bits: &'a [u8],
+}
+
+impl<'a> BitIterator<'a> {
+    pub fn new(bits: &'a [u8]) -> Self {
         BitIterator {
             byte_offset: 0,
             bit_offset: 7,
@@ -225,7 +243,7 @@ impl BitIterator {
     }
 }
 
-impl Iterator for BitIterator {
+impl<'a> Iterator for BitIterator<'a> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -244,12 +262,12 @@ impl Iterator for BitIterator {
     }
 }
 
-struct Parser {
-    bit_iter: BitIterator,
+struct Parser<'a> {
+    bit_iter: BitIterator<'a>,
 }
 
-impl Parser {
-    fn new(bits: Box<[u8]>) -> Self {
+impl<'a> Parser<'a> {
+    fn new(bits: &'a[u8]) -> Self {
         Self {
             bit_iter: BitIterator::new(bits)
         }
@@ -395,7 +413,7 @@ impl Parser {
     }
 }
 
-impl Iterator for Parser {
+impl<'a> Iterator for Parser<'a> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -404,26 +422,26 @@ impl Iterator for Parser {
 }
 
 
-impl TryFrom<Box<[u8]>> for Stamp {
+impl TryFrom<&[u8]> for Stamp {
     type Error = ParseError;
 
-    fn try_from(bits: Box<[u8]>) -> std::result::Result<Self, Self::Error> {
+    fn try_from(bits: &[u8]) -> std::result::Result<Self, Self::Error> {
         Parser::new(bits).parse_stamp().ok_or(ParseError::EndOfEncoding)
     }
 }
 
-impl TryFrom<Box<[u8]>> for IdTree {
+impl TryFrom<&[u8]> for IdTree {
     type Error = ParseError;
 
-    fn try_from(bits: Box<[u8]>) -> std::result::Result<Self, Self::Error> {
+    fn try_from(bits: &[u8]) -> std::result::Result<Self, Self::Error> {
         Parser::new(bits).parse_id_tree().ok_or(ParseError::EndOfEncoding)
     }
 }
 
-impl TryFrom<Box<[u8]>> for EventTree {
+impl TryFrom<&[u8]> for EventTree {
     type Error = ParseError;
 
-    fn try_from(bits: Box<[u8]>) -> std::result::Result<Self, Self::Error> {
+    fn try_from(bits: &[u8]) -> std::result::Result<Self, Self::Error> {
         Parser::new(bits).parse_event_tree().ok_or(ParseError::EndOfEncoding)
     }
 }
