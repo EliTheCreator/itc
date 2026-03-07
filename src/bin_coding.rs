@@ -61,10 +61,7 @@ impl BitWriter {
     }
 
     pub fn finalize(mut self) -> Box<[u8]> {
-        if self.current != 0 {
-            self.bytes.push(self.current);
-        }
-
+        self.bytes.push(self.current);
         self.bytes.into_boxed_slice()
     }
 }
@@ -177,7 +174,7 @@ impl Encoder {
     }
 
     fn encode_u32(&mut self, n: u32, b: u8) {
-        let two_to_pow_b = 2<<b;
+        let two_to_pow_b = 1<<b;
         if n < two_to_pow_b {
             self.bit_writer.write_bit(false);
             self.bit_writer.write_bits(n, b);
@@ -404,9 +401,9 @@ impl<'a> Parser<'a> {
             Some((1<<b) + self.parse_u32(b+1)?)
         } else {
             let mut n: u32 = 0;
-            for offset in (0..b).rev() {
-                let bit = self.next()? as u32;
-                n += bit<<offset;
+            for _ in 0..b {
+                n <<= 1;
+                n |= self.next()? as u32;
             }
             Some(n)
         }
@@ -473,12 +470,28 @@ mod tests {
     fn bin_decode() {
         let bits: Box<[u8]> = vec![0b1000_1011,0b0110_1011,0b1101_1101].into_boxed_slice();
 
-        let stamp = Stamp::try_from(bits).unwrap();
+        let stamp = Stamp::try_from(bits.as_ref()).unwrap();
         let control = Stamp::new(
             IdTree::node(Box::new(IdTree::one()), Box::new(IdTree::zero())),
             EventTree::node(2, Box::new(EventTree::leaf(57)), Box::new(EventTree::leaf(0))),
         );
 
         assert_eq!(stamp, control)
+    }
+
+    #[test]
+    fn bin_event_encode_decode() {
+        let event = EventTree::node(
+            4,
+            Box::new(EventTree::leaf(4)),
+            Box::new(EventTree::leaf(0)),
+        );
+
+        let encoding: Box<[u8]> = (&event).into();
+        println!("{:#?}", encoding);
+
+        let decoded_event: EventTree = EventTree::try_from(encoding.as_ref()).unwrap();
+
+        assert_eq!(event, decoded_event);
     }
 }
